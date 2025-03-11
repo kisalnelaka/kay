@@ -8,6 +8,13 @@ import pyttsx3
 # Initialize text-to-speech engine
 engine = pyttsx3.init()
 
+# Configure voice settings
+voices = engine.getProperty('voices')
+# Set male voice (usually index 0 is male)
+engine.setProperty('voice', voices[0].id)
+# Set speaking rate (default is 200)
+engine.setProperty('rate', 175)
+
 def speak(text):
     """Speak the provided text aloud."""
     print("Kay:", text)
@@ -17,9 +24,41 @@ def speak(text):
 def listen():
     """Listen to a voice command and return it as a lower-case string."""
     r = sr.Recognizer()
-    with sr.Microphone() as source:
-        speak("Listening...")
-        audio = r.listen(source)
+    try:
+        # List available microphones
+        print("Available microphones:", sr.Microphone.list_microphone_names())
+        
+        # Find the JBL Tune 720BT microphone
+        mic_index = None
+        for index, name in enumerate(sr.Microphone.list_microphone_names()):
+            if "JBL Tune 720BT" in name and "Hands-Free" in name:
+                mic_index = index
+                break
+        
+        if mic_index is None:
+            speak("Could not find JBL headset microphone. Using default microphone.")
+            mic_index = 0
+        
+        print(f"Using microphone: {sr.Microphone.list_microphone_names()[mic_index]}")
+        
+        with sr.Microphone(device_index=mic_index) as source:
+            print("Adjusting for ambient noise...")
+            r.adjust_for_ambient_noise(source, duration=2)
+            r.energy_threshold = 1000  # Lower threshold for better sensitivity
+            r.dynamic_energy_threshold = True
+            r.pause_threshold = 0.8  # Shorter pause threshold
+            speak("Listening...")
+            try:
+                audio = r.listen(source, timeout=5, phrase_time_limit=10)
+                print("Audio captured, processing...")
+            except sr.WaitTimeoutError:
+                speak("No speech detected. Please try again.")
+                return ""
+    except Exception as e:
+        speak(f"Error accessing microphone: {str(e)}")
+        print("Microphone Error Details:", str(e))
+        return ""
+
     try:
         command = r.recognize_google(audio)
         print("You said:", command)
@@ -27,8 +66,9 @@ def listen():
     except sr.UnknownValueError:
         speak("I didn't catch that. Please try again.")
         return ""
-    except sr.RequestError:
+    except sr.RequestError as e:
         speak("There was an issue with the speech service.")
+        print("Speech Service Error Details:", str(e))
         return ""
 
 def list_files(directory):
@@ -213,7 +253,7 @@ def process_command(command):
         speak("Sorry, I did not recognize that command.")
 
 def main():
-    speak("Hello, I am Kay, your file management assistant. How can I help you?")
+    speak("Hello Kisal, I am Kay, your personal file management assistant. I'm here to help you organize and manage your files. Just say 'help' if you need to know what I can do.")
     while True:
         command = listen()
         if command:
